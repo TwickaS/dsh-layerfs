@@ -14,14 +14,14 @@
     ".": "./lib/index.js",
     "./client": "./lib/client.js",
     "./package.json": "./package.json",
-    "./sandbox-policy": "./lib/sandbox-policy.js",
+    "./sandbox-grants": "./lib/sandbox-grants.js",
     "./session-persistence": "./lib/session-persistence.js",
     "./skills": "./lib/skills.js"
   },
   "files": [
     "lib/index.js",
     "lib/client.js",
-    "lib/sandbox-policy.js",
+    "lib/sandbox-grants.js",
     "lib/session-persistence.js",
     "lib/skills.js",
     "skills",

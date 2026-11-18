@@ -2,7 +2,7 @@
  * dsh-layerfs, host half: Machines, Storage, project-owned conversations and
  * stock workspace sessions. Project sessions use the selected folder as scratch,
  * native DSH logs, additive operation receipts, and saved file checkpoints.
- * The bundle's other rows live in session-persistence.ts and sandbox-policy.ts.
+ * The bundle's other rows live in session-persistence.ts and sandbox-grants.ts.
  *
  * Composition (each part registers operations on the `layerfs` Remote):
  *   remote.ts       the `layerfs` Remote namespace (call + events)

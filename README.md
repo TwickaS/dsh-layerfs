@@ -466,7 +466,7 @@ The bundle patch changes the following DSH rows:
 | Row | Change |
 | --- | --- |
 | `session-persistence-jsonl` | Replaced by `layerfs-session-persistence`: stock JSONL stays the normal-session backend; project ownership routes native unpacked logs to a separate root. Missing project logs can be imported from the project archive |
-| `sandbox-policy` | Replaced by a subclass that keeps selected scratch as the local working root and allows the bound project mount, private LayerFS runtime, and invocation receipts; normal sessions retain stock policy |
+| `sandbox-policy` | Stays enabled. `layerfs-sandbox-grants` adds writable roots for a bound session through the policy's `registerWritableRoot`: its scratch folder, the project mount, invocation receipts and its own Store, Sandbox records and machine in the LayerFS home. The mode, workspace root, network and guards are the stock policy's; normal sessions get no grant |
 
 A project session's step requires its project execution context to be ready:
 when it cannot be bound, the turn fails with LayerFS's reason. A session without a
