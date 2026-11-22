@@ -12,7 +12,7 @@ const root = new URL('..', import.meta.url).pathname
 mkdirSync(join(root, 'lib'), { recursive: true })
 const out = mkdtempSync(join(root, 'lib', '.test-sandbox-grants-'))
 await build({ absWorkingDir: root, entryPoints: [join(root, 'src/host/sandbox-grants.ts')], outfile: join(out, 'policy.mjs'), bundle: true, format: 'esm', platform: 'node', target: 'node24', external: ['@deepseek-ai/*'], logLevel: 'warning' })
-const { sessionHomeRoots, desiredRoots, apply } = await import(pathToFileURL(join(out, 'policy.mjs')).href)
+const { sessionHomeRoots, desiredRoots, outsideProtectedHome, apply } = await import(pathToFileURL(join(out, 'policy.mjs')).href)
 test.after(() => rmSync(out, { recursive: true, force: true }))
 
 test('a bound session writes only its own Store, Sandbox and machine in the LayerFS home', () => {
@@ -104,4 +104,24 @@ test('the bundle patch leaves the stock sandbox-policy and its guards enabled', 
   assert.ok(!/id: sandbox-policy[\s\S]{0,40}disabled: true/.test(patch), 'sandbox-policy is never disabled')
   assert.ok(!/@deepseek-ai\/dsh-sandbox-policy/.test(patch.replace(/#.*$/gm, '')), 'no row replaces the sandbox policy service')
   assert.ok(/name: dsh-layerfs\/sandbox-grants/.test(patch))
+})
+
+test('denial: a root inside, equal to or containing the sandbox\'s protected home is never registered', async () => {
+  const { dir, home, scratch, mount, layerRoot } = scratchHome()
+  try {
+    const protectedHome = join(dir, 'delorun-home'), inside = join(protectedHome, 'layerfs', 'trace')
+    mkdirSync(inside, { recursive: true })
+    assert.deepEqual(outsideProtectedHome([scratch, inside, protectedHome, dir], protectedHome), [scratch], 'inside, equal and containing roots are dropped')
+    assert.deepEqual(outsideProtectedHome([scratch, inside], undefined), [scratch, inside], 'no protected home keeps every root')
+    const registered = []
+    const policy = { registerWritableRoot: (_s, directory) => { registered.push(directory); return () => {} } }
+    const binding = { state: 'bound', scratch, mount, project: 'mine/app', sandbox: 'dsh-a', machine: 'native' }
+    const handlers = {}
+    const services = { sandbox: { protectedHome }, sandboxPolicy: policy, layerfs: { home, root: join(protectedHome, 'layerfs') }, layerfsSessions: { binding: () => binding, isSimulationManaged: () => false, ensureBound: async () => {} } }
+    const inner = { ...fakeCtx(services), on: (event, fn) => { handlers[event] = fn }, effect: () => {}, inject: (_names, fn) => fn(inner) }
+    apply(inner)
+    await handlers['tools/execute']({ agent: { id: 's1', session: { id: 's1' } } }, async () => {})
+    assert.ok(registered.length > 0 && registered.includes(scratch))
+    assert.ok(registered.every((d) => d !== protectedHome && !d.startsWith(protectedHome + '/')), 'nothing under the protected home is registered')
+  } finally { rmSync(dir, { recursive: true, force: true }) }
 })

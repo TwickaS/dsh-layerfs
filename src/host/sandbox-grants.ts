@@ -13,8 +13,8 @@
  * workspace root, or remove another grant, and a grant ends with its session
  * binding or its agent.
  */
-import { existsSync, statSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, realpathSync, statSync } from 'node:fs'
+import { join, resolve, sep } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 
 export const name = 'dsh-layerfs-sandbox-grants'
@@ -45,6 +45,23 @@ export function sessionHomeRoots(home: string | undefined, binding: { project?: 
     options.createSandboxes ? join(home, 'sandbox') : sandbox && join(home, 'sandbox', sandbox),
     machine && join(home, 'machine', machine),
   ].filter((dir): dir is string => !!dir && isDir(dir))
+}
+
+/**
+ * Drop the directories a sandbox that protects a home would refuse: the stock local
+ * provider fails every command of a session whose writable roots equal, lie inside or
+ * contain its `protectedHome` (`HOME_IN_WRITABLE_ROOT`), so one such grant would stop
+ * the session's whole shell. A host that protects no home (`undefined`) keeps all.
+ * @param roots - the wanted writable roots.
+ * @param protectedHome - the sandbox provider's `protectedHome`, if any.
+ * @returns the roots clear of it.
+ */
+export function outsideProtectedHome(roots: string[], protectedHome: string | undefined): string[] {
+  if (!protectedHome) return roots
+  const real = (path: string): string => { try { return realpathSync.native(path) } catch { return resolve(path) } }
+  const home = real(protectedHome)
+  const within = (path: string, base: string): boolean => path === base || path.startsWith(base.endsWith(sep) ? base : base + sep)
+  return roots.filter((dir) => { const r = real(dir); return !within(r, home) && !within(home, r) })
 }
 
 /** What a binding looks like to the grants; the session service's own record. */
@@ -96,7 +113,7 @@ export function apply(ctx: Context): void {
     const held = new Map<string, Map<string, () => void>>()
     const reconcile = (session: any): void => {
       const id = String(session.id)
-      const want = new Set(desiredRoots(inner, id))
+      const want = new Set(outsideProtectedHome(desiredRoots(inner, id), (inner as any).get?.('sandbox')?.protectedHome))
       const have = held.get(id) ?? new Map<string, () => void>()
       for (const [dir, dispose] of have) if (!want.has(dir)) { dispose(); have.delete(dir) }
       for (const dir of want) if (!have.has(dir)) have.set(dir, (inner as any).get('sandboxPolicy').registerWritableRoot(session, dir))
