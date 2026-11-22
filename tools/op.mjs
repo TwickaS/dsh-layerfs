@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 // Call one dsh-layerfs operation through a real browser page of the dev server.
+//   DSH_LAYERFS_URL=<studio link> overrides the dev server's url.txt (a Delorun studio link signs in once);
+//   DSH_LAYERFS_CHROME=<path> picks the browser, else Playwright's own Chromium.
 //   node tools/op.mjs <op> [json-args]      (http op: node tools/op.mjs http '{"method":"GET","path":"/api/machines"}')
 import { chromium } from 'playwright-core'
 import { readFileSync } from 'node:fs'
 const [name, json = '{}'] = process.argv.slice(2)
 import { devUrl } from './ui.mjs'
-const url = devUrl()
-const browser = await chromium.launch({ executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true })
+const url = process.env.DSH_LAYERFS_URL ?? devUrl()
+const browser = await chromium.launch({ ...(process.env.DSH_LAYERFS_CHROME || process.platform === 'darwin' ? { executablePath: process.env.DSH_LAYERFS_CHROME ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' } : {}), headless: true })
 const page = await browser.newPage()
 await page.addInitScript(() => { localStorage.setItem('dsh-layerfs:debug', '1') })
 await page.goto(url, { waitUntil: 'networkidle' })
